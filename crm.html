@@ -33581,7 +33581,23 @@ function resetData() {
   return { ...defaultData };
 }
 
-window.CRM = { loadData, saveData, resetData, defaultData };
+// Merge Viggler contacts into any data object (safe to call repeatedly — skips existing IDs)
+function mergeVigglers(data) {
+  if (!data.creators) data.creators = [];
+  const existingIds = new Set(data.creators.map(c => c.id));
+  if (VIGGLER_CREATORS.every(c => existingIds.has(c.id))) return data; // already there
+  const trevor = (data.team_members || []).find(m => m.name && m.name.toLowerCase().includes('trevor'));
+  const trevorId = trevor ? trevor.id : (data.team_members && data.team_members[0] ? data.team_members[0].id : '1');
+  VIGGLER_CREATORS.forEach(c => {
+    if (!existingIds.has(c.id)) {
+      data.creators.push({ ...c, owner_id: trevorId });
+      existingIds.add(c.id);
+    }
+  });
+  return data;
+}
+
+window.CRM = { loadData, saveData, resetData, mergeVigglers, defaultData };
 </script>
 <script>window.Utils = {
   uid() {
@@ -36929,9 +36945,10 @@ function App() {
         if (session) {
           const sbData = await DB.loadData();
           if (sbData) {
-            const merged = { ...localData, ...sbData };
+            const merged = CRM.mergeVigglers({ ...localData, ...sbData });
             setDataRaw(merged);
             CRM.saveData(merged);
+            DB.saveData(merged);
           }
           setAppState('ready');
         } else {
