@@ -34353,7 +34353,7 @@ function CreatorForm({ creator, data, setData, onSave, onClose }) {
   );
 }
 
-function Creators({ data, setData, navigate }) {
+function Creators({ data, setData, navigate, myView }) {
   const [search, setSearch] = React.useState('');
   const [filterStatus, setFilterStatus] = React.useState('');
   const [filterProduct, setFilterProduct] = React.useState('');
@@ -34367,7 +34367,8 @@ function Creators({ data, setData, navigate }) {
     const matchStatus = !filterStatus || c.current_status === filterStatus;
     const matchProduct = !filterProduct || c.product_fit === filterProduct;
     const matchPlatform = !filterPlatform || c.primary_platform === filterPlatform;
-    return matchSearch && matchStatus && matchProduct && matchPlatform;
+    const matchOwner = !myView || c.owner_id === data.current_user_id;
+    return matchSearch && matchStatus && matchProduct && matchPlatform && matchOwner;
   });
 
   function ownerName(id) {
@@ -34777,7 +34778,7 @@ function Creators({ data, setData, navigate }) {
 </script>
 <script type="text/babel" data-presets="crm" data-file="Pipeline.js">const PIPELINE_STATUSES = ['Not contacted','Contacted','Responded','Interested','Negotiating','Approved internally','Contract sent','Contract signed','Content in progress','Content submitted','In review','Approved','Scheduled','Posted','Paid','Archived'];
 
-function Pipeline({ data, setData, navigate }) {
+function Pipeline({ data, setData, navigate, myView }) {
   const [view, setView] = React.useState('kanban');
   const [search, setSearch] = React.useState('');
   const [filterProduct, setFilterProduct] = React.useState('');
@@ -34793,7 +34794,8 @@ function Pipeline({ data, setData, navigate }) {
     const matchSearch = !q || c.name.toLowerCase().includes(q) || (c.handle||'').toLowerCase().includes(q);
     const matchProduct = !filterProduct || c.product_fit === filterProduct;
     const matchOwner = !filterOwner || c.owner_id === filterOwner;
-    return matchSearch && matchProduct && matchOwner;
+    const matchMyView = !myView || c.owner_id === data.current_user_id;
+    return matchSearch && matchProduct && matchOwner && matchMyView;
   });
 
   function moveCreator(creatorId, newStatus) {
@@ -35004,7 +35006,7 @@ function DealForm({ deal, data, setData, onSave, onClose }) {
   );
 }
 
-function Deals({ data, setData, navigate }) {
+function Deals({ data, setData, navigate, myView }) {
   const [modal, setModal] = React.useState(null);
   const [filterStatus, setFilterStatus] = React.useState('');
   const [filterProduct, setFilterProduct] = React.useState('');
@@ -35017,7 +35019,8 @@ function Deals({ data, setData, navigate }) {
   const filtered = data.deals.filter(d => {
     const q = search.toLowerCase();
     const matchSearch = !q || d.deal_name.toLowerCase().includes(q) || creatorName(d.creator_id).toLowerCase().includes(q);
-    return matchSearch && (!filterStatus || d.deal_status===filterStatus) && (!filterProduct || d.product===filterProduct || d.product==='Both');
+    const matchMyView = !myView || d.owner_id === data.current_user_id;
+    return matchSearch && (!filterStatus || d.deal_status===filterStatus) && (!filterProduct || d.product===filterProduct || d.product==='Both') && matchMyView;
   });
 
   function saveDeal(form) {
@@ -35362,7 +35365,7 @@ function VideoCalendar({ videos, data, setData }) {
   );
 }
 
-function Videos({ data, setData, navigate }) {
+function Videos({ data, setData, navigate, myView }) {
   const [view, setView] = React.useState('kanban');
   const [modal, setModal] = React.useState(null);
   const [filterProject, setFilterProject] = React.useState('');
@@ -35377,7 +35380,8 @@ function Videos({ data, setData, navigate }) {
   const filtered = data.videos.filter(v => {
     const q = search.toLowerCase();
     const matchSearch = !q || v.video_title.toLowerCase().includes(q) || creatorName(v.creator_id).toLowerCase().includes(q);
-    return matchSearch && (!filterProject || v.project===filterProject) && (!filterCreator || v.creator_id===filterCreator);
+    const matchMyView = !myView || v.owner_id === data.current_user_id;
+    return matchSearch && (!filterProject || v.project===filterProject) && (!filterCreator || v.creator_id===filterCreator) && matchMyView;
   });
 
   function saveVideo(form) {
@@ -36827,6 +36831,7 @@ function App() {
   const [page, setPage] = React.useState('dashboard');
   const [creatorId, setCreatorId] = React.useState(null);
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [myView, setMyView] = React.useState(false);
 
   React.useEffect(() => {
     async function init() {
@@ -37016,6 +37021,13 @@ function App() {
             </span>
           )}
           <div className="ml-auto flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setMyView(v => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${myView ? 'bg-lime-400 text-gray-900 border-lime-500 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              {myView ? 'My Contacts' : 'Everyone'}
+            </button>
             {overdueCount > 0 && (
               <button onClick={() => navigate('videos')}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition-all">
@@ -37043,12 +37055,12 @@ function App() {
         {/* Page */}
         <main className="flex-1 overflow-y-auto p-5">
           {page === 'dashboard'       && <Dashboard data={data} navigate={navigate} />}
-          {page === 'creators'        && <Creators data={data} setData={setData} navigate={navigate} />}
+          {page === 'creators'        && <Creators data={data} setData={setData} navigate={navigate} myView={myView} />}
           {page === 'creator-profile' && <CreatorProfile data={data} setData={setData} creatorId={creatorId} navigate={navigate} />}
-          {page === 'pipeline'        && <Pipeline data={data} setData={setData} navigate={navigate} />}
-          {page === 'deals'           && <Deals data={data} setData={setData} navigate={navigate} />}
-          {page === 'contracts'       && <Contracts data={data} setData={setData} />}
-          {page === 'videos'          && <Videos data={data} setData={setData} navigate={navigate} />}
+          {page === 'pipeline'        && <Pipeline data={data} setData={setData} navigate={navigate} myView={myView} />}
+          {page === 'deals'           && <Deals data={data} setData={setData} navigate={navigate} myView={myView} />}
+          {page === 'contracts'       && <Contracts data={data} setData={setData} myView={myView} />}
+          {page === 'videos'          && <Videos data={data} setData={setData} navigate={navigate} myView={myView} />}
           {page === 'payments'        && <Payments data={data} setData={setData} />}
           {page === 'content'         && <Content data={data} setData={setData} />}
           {page === 'links'           && <CampaignLinks data={data} setData={setData} />}
