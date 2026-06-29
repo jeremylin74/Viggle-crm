@@ -34456,6 +34456,7 @@ function Creators({ data, setData, navigate, myView }) {
   const [filterProduct, setFilterProduct] = React.useState('');
   const [filterPlatform, setFilterPlatform] = React.useState('');
   const [filterSource, setFilterSource] = React.useState('');
+  const [filterCampaign, setFilterCampaign] = React.useState('');
   const [modal, setModal] = React.useState(null); // null | 'add' | creatorObj
   const productLabels = getProductLabels(data);
 
@@ -34466,8 +34467,9 @@ function Creators({ data, setData, navigate, myView }) {
     const matchProduct = !filterProduct || c.product_fit === filterProduct;
     const matchPlatform = !filterPlatform || c.primary_platform === filterPlatform;
     const matchSource = !filterSource || c.source === filterSource;
+    const matchCampaign = !filterCampaign || c.campaign_id === filterCampaign;
     const matchOwner = !myView || c.owner_id === data.current_user_id;
-    return matchSearch && matchStatus && matchProduct && matchPlatform && matchSource && matchOwner;
+    return matchSearch && matchStatus && matchProduct && matchPlatform && matchSource && matchCampaign && matchOwner;
   });
 
   function ownerName(id) {
@@ -34549,14 +34551,18 @@ function Creators({ data, setData, navigate, myView }) {
             <option value="">All platforms</option>
             {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
+          <select value={filterCampaign} onChange={e => setFilterCampaign(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-lime-400 transition-all">
+            <option value="">All campaigns</option>
+            {data.campaigns.map(c => <option key={c.id} value={c.id}>{c.campaign_name}</option>)}
+          </select>
           <button
             onClick={() => setFilterSource(s => s === 'Viggler' ? '' : 'Viggler')}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-all ${filterSource === 'Viggler' ? 'bg-lime-400 text-gray-900 border-lime-500' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
           >
             ⚡ Vigglers
           </button>
-          {(search || filterStatus || filterProduct || filterPlatform || filterSource) && (
-            <Btn size="sm" variant="ghost" onClick={() => { setSearch(''); setFilterStatus(''); setFilterProduct(''); setFilterPlatform(''); setFilterSource(''); }}>Clear</Btn>
+          {(search || filterStatus || filterProduct || filterPlatform || filterSource || filterCampaign) && (
+            <Btn size="sm" variant="ghost" onClick={() => { setSearch(''); setFilterStatus(''); setFilterProduct(''); setFilterPlatform(''); setFilterSource(''); setFilterCampaign(''); }}>Clear</Btn>
           )}
           <span className="ml-auto text-xs text-gray-400">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
         </div>
