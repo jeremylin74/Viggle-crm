@@ -33597,16 +33597,19 @@ window.CRM = { loadData, saveData, resetData, defaultData };
   var _client = null;
   var _sub = null;
 
+  var DEFAULT_URL = 'https://qrxjmcmmntkyffjqatqz.supabase.co';
+  var DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyeGptY21tbnRreWZmanFhdHF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NDU0ODUsImV4cCI6MjA5ODMyMTQ4NX0.FnNwa6-gecmX7EXASuoi8D2KU_0d05p21CYMckT9U2w';
+
   function getClient() {
-    var url = localStorage.getItem('crm_supabase_url');
-    var key = localStorage.getItem('crm_supabase_key');
+    var url = localStorage.getItem('crm_supabase_url') || DEFAULT_URL;
+    var key = localStorage.getItem('crm_supabase_key') || DEFAULT_KEY;
     if (!url || !key || !window.supabase) return null;
     if (!_client) _client = window.supabase.createClient(url, key);
     return _client;
   }
 
   function isConfigured() {
-    return !!(localStorage.getItem('crm_supabase_url') && localStorage.getItem('crm_supabase_key') && window.supabase);
+    return !!window.supabase;
   }
 
   function resetClient() {
@@ -34439,7 +34442,7 @@ function Creators({ data, setData, navigate }) {
             {CREATOR_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <select value={filterProduct} onChange={e => setFilterProduct(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-lime-400 transition-all">
-            <option value="">All campaigns</option>
+            <option value="">All products</option>
             {productLabels.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
           <select value={filterPlatform} onChange={e => setFilterPlatform(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:border-lime-400 transition-all">
@@ -34479,8 +34482,16 @@ function Creators({ data, setData, navigate }) {
 </script>
 <script type="text/babel" data-presets="crm" data-file="CreatorProfile.js">function CreatorProfile({ data, setData, creatorId, navigate }) {
   const [tab, setTab] = React.useState('overview');
+  const [editing, setEditing] = React.useState(false);
   const creator = data.creators.find(c => c.id === creatorId);
   if (!creator) return <div className="p-8 text-gray-400">Creator not found. <button onClick={() => navigate('creators')} className="text-blue-500 underline">Back to creators</button></div>;
+
+  function saveEdit(form) {
+    const now = Utils.now();
+    const log = { id: Utils.uid(), user_id: data.current_user_id, action: 'Creator updated', related_creator_id: form.id, related_deal_id: null, related_campaign_id: null, related_payment_id: null, related_video_id: null, old_value: null, new_value: form.name, timestamp: now };
+    setData(d => ({ ...d, creators: d.creators.map(c => c.id === form.id ? { ...form, updated_at: now } : c), activity_log: [log, ...d.activity_log] }));
+    setEditing(false);
+  }
 
   const deals = data.deals.filter(d => d.creator_id === creatorId);
   const outreach = data.outreach.filter(o => o.creator_id === creatorId);
@@ -34525,7 +34536,7 @@ function Creators({ data, setData, navigate }) {
 
       <Card className="p-5">
         <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white text-xl font-bold shrink-0">
+          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-lime-400 to-green-600 flex items-center justify-center text-white text-xl font-bold shrink-0">
             {creator.name?.[0]?.toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -34537,7 +34548,7 @@ function Creators({ data, setData, navigate }) {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className={Utils.statusColor(creator.current_status)}>{creator.current_status}</Badge>
                 <Badge className={Utils.productColor(creator.product_fit)}>{creator.product_fit}</Badge>
-                <Btn size="sm" variant="secondary" onClick={() => navigate('creators')}>Edit</Btn>
+                <Btn size="sm" variant="secondary" onClick={() => setEditing(true)}>Edit</Btn>
               </div>
             </div>
             <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-500">
@@ -34736,7 +34747,7 @@ function Creators({ data, setData, navigate }) {
             <div className="space-y-3">
               {logs.map((log, i) => (
                 <div key={log.id || i} className="flex items-start gap-3 text-sm">
-                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mt-1.5 shrink-0" />
+                  <div className="w-1.5 h-1.5 bg-lime-400 rounded-full mt-1.5 shrink-0" />
                   <div className="flex-1">
                     <span className="text-gray-700">{log.action}</span>
                     {log.new_value && <span className="text-gray-500 ml-1">→ {log.new_value}</span>}
@@ -34748,6 +34759,18 @@ function Creators({ data, setData, navigate }) {
           )}
         </Card>
       )}
+
+      <Modal open={editing} onClose={() => setEditing(false)} title="Edit Creator" size="lg">
+        {editing && (
+          <CreatorForm
+            creator={creator}
+            data={data}
+            setData={setData}
+            onSave={saveEdit}
+            onClose={() => setEditing(false)}
+          />
+        )}
+      </Modal>
     </div>
   );
 }
@@ -34763,11 +34786,12 @@ function Pipeline({ data, setData, navigate }) {
   const [dragOver, setDragOver] = React.useState(null);
 
   const ownerName = id => data.team_members.find(m => m.id === id)?.name || '—';
+  const productLabels = (data.product_labels && data.product_labels.length > 0) ? data.product_labels : ['Viggle','PINOC','Both'];
 
   const filtered = data.creators.filter(c => {
     const q = search.toLowerCase();
     const matchSearch = !q || c.name.toLowerCase().includes(q) || (c.handle||'').toLowerCase().includes(q);
-    const matchProduct = !filterProduct || c.product_fit === filterProduct || c.product_fit === 'Both';
+    const matchProduct = !filterProduct || c.product_fit === filterProduct;
     const matchOwner = !filterOwner || c.owner_id === filterOwner;
     return matchSearch && matchProduct && matchOwner;
   });
@@ -34822,7 +34846,7 @@ function Pipeline({ data, setData, navigate }) {
           <SearchInput value={search} onChange={setSearch} placeholder="Search creators..." />
           <select value={filterProduct} onChange={e => setFilterProduct(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
             <option value="">All products</option>
-            <option>Viggle</option><option>PINOC</option><option>Both</option>
+            {productLabels.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
           <select value={filterOwner} onChange={e => setFilterOwner(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
             <option value="">All owners</option>
@@ -34998,10 +35022,13 @@ function Deals({ data, setData, navigate }) {
 
   function saveDeal(form) {
     const now = Utils.now();
-    if (!form.id) {
-      setData(d => ({ ...d, deals: [...d.deals, {...form, id:Utils.uid(), created_at:now, updated_at:now}] }));
+    const isNew = !form.id;
+    const id = form.id || Utils.uid();
+    const log = { id: Utils.uid(), user_id: data.current_user_id, action: isNew ? 'Deal added' : 'Deal updated', related_creator_id: form.creator_id, related_deal_id: id, related_campaign_id: form.campaign_id||null, related_payment_id: null, related_video_id: null, old_value: null, new_value: form.deal_name, timestamp: now };
+    if (isNew) {
+      setData(d => ({ ...d, deals: [...d.deals, {...form, id, created_at:now, updated_at:now}], activity_log: [log, ...d.activity_log] }));
     } else {
-      setData(d => ({ ...d, deals: d.deals.map(x => x.id===form.id ? {...form,updated_at:now} : x) }));
+      setData(d => ({ ...d, deals: d.deals.map(x => x.id===form.id ? {...form,updated_at:now} : x), activity_log: [log, ...d.activity_log] }));
     }
     setModal(null);
   }
@@ -35119,81 +35146,218 @@ function VideoForm({ video, data, setData, onSave, onClose }) {
   );
 }
 
-function VideoCalendar({ videos, data }) {
+const STATUS_COLORS_CAL = {
+  'Signed':           { dot:'bg-violet-400', pill:'bg-violet-100 text-violet-700' },
+  'Awaiting Draft':   { dot:'bg-yellow-400', pill:'bg-yellow-100 text-yellow-700' },
+  'Draft Submitted':  { dot:'bg-orange-400', pill:'bg-orange-100 text-orange-700' },
+  'In Review':        { dot:'bg-pink-400',   pill:'bg-pink-100 text-pink-700' },
+  'Revision Needed':  { dot:'bg-red-400',    pill:'bg-red-100 text-red-700' },
+  'Approved':         { dot:'bg-emerald-400',pill:'bg-emerald-100 text-emerald-700' },
+  'Scheduled':        { dot:'bg-sky-400',    pill:'bg-sky-100 text-sky-700' },
+  'Posted':           { dot:'bg-green-500',  pill:'bg-green-100 text-green-700' },
+  'Cancelled':        { dot:'bg-gray-400',   pill:'bg-gray-100 text-gray-500' },
+  'Overdue':          { dot:'bg-red-600',    pill:'bg-red-100 text-red-800' },
+  'Paid':             { dot:'bg-teal-400',   pill:'bg-teal-100 text-teal-700' },
+};
+function calDot(v) { return (STATUS_COLORS_CAL[v.video_status]||{dot:'bg-gray-300'}).dot; }
+function calPill(v) { return (STATUS_COLORS_CAL[v.video_status]||{pill:'bg-gray-100 text-gray-500'}).pill; }
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function ymd(d){return d.toISOString().slice(0,10);}
+
+function VideoCalendar({ videos, data, setData }) {
   const creatorName = id => data.creators.find(c=>c.id===id)?.name || '?';
-  const [offset, setOffset] = React.useState(0);
+  const [calView, setCalView] = React.useState('monthly');
+  const [anchorDate, setAnchorDate] = React.useState(ymd(new Date()));
+  const [selectedDay, setSelectedDay] = React.useState(null);
+  const [dragCalVideo, setDragCalVideo] = React.useState(null);
+  const [dragCalOver, setDragCalOver] = React.useState(null);
 
-  const today = new Date();
-  const viewDate = new Date(today.getFullYear(), today.getMonth() + offset, 1);
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-  const monthLabel = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const todayStr = ymd(new Date());
+  const anchor = new Date(anchorDate + 'T00:00:00');
 
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  function shiftAnchor(dir) {
+    const d = new Date(anchor);
+    if (calView==='daily') d.setDate(d.getDate()+dir);
+    else if (calView==='3day') d.setDate(d.getDate()+dir*3);
+    else if (calView==='weekly') d.setDate(d.getDate()+dir*7);
+    else d.setMonth(d.getMonth()+dir);
+    setAnchorDate(ymd(d)); setSelectedDay(null);
+  }
+  function goToday(){setAnchorDate(todayStr);setSelectedDay(null);}
 
-  // Build map: date string → [video, ...]
   const byDate = {};
-  videos.forEach(v => {
-    const d = v.scheduled_post_date || v.actual_post_date;
-    if (!d) return;
-    const ds = d.slice(0, 10);
-    if (!byDate[ds]) byDate[ds] = [];
-    byDate[ds].push(v);
+  videos.forEach(v=>{
+    const d=v.scheduled_post_date||v.actual_post_date; if(!d)return;
+    const ds=d.slice(0,10); if(!byDate[ds])byDate[ds]=[]; byDate[ds].push(v);
   });
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  function dropOnDate(ds){
+    if(!dragCalVideo||dragCalVideo.date===ds){setDragCalVideo(null);setDragCalOver(null);return;}
+    const now=Utils.now();
+    setData(d=>({...d,videos:d.videos.map(x=>x.id===dragCalVideo.id?{...x,scheduled_post_date:ds,updated_at:now}:x)}));
+    setDragCalVideo(null);setDragCalOver(null);
+  }
 
-  const statusDot = v => {
-    if (v.video_status === 'Posted') return 'bg-green-400';
-    if (v.video_status === 'Scheduled') return 'bg-sky-400';
-    if (v.video_status === 'Approved') return 'bg-emerald-400';
-    return 'bg-yellow-400';
-  };
+  let days=[];
+  if(calView==='daily') days=[ymd(anchor)];
+  else if(calView==='3day') for(let i=0;i<3;i++) days.push(ymd(addDays(anchor,i)));
+  else if(calView==='weekly'){const dow=anchor.getDay();const sun=addDays(anchor,-dow);for(let i=0;i<7;i++)days.push(ymd(addDays(sun,i)));}
 
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={()=>setOffset(o=>o-1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">‹</button>
-        <h3 className="font-semibold text-gray-800">{monthLabel}</h3>
-        <button onClick={()=>setOffset(o=>o+1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">›</button>
-      </div>
-      <div className="grid grid-cols-7 gap-0.5 mb-1">
-        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
-          <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1">{d}</div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-0.5">
-        {cells.map((day, i) => {
-          if (!day) return <div key={'e'+i} />;
-          const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-          const dayVideos = byDate[ds] || [];
-          const isToday = ds === todayStr;
-          return (
-            <div key={ds} className={`min-h-16 rounded-lg p-1 border ${isToday?'border-blue-400 bg-blue-50':'border-gray-100 bg-gray-50/50'}`}>
-              <div className={`text-xs font-semibold mb-1 ${isToday?'text-blue-600':'text-gray-500'}`}>{day}</div>
-              <div className="space-y-0.5">
-                {dayVideos.slice(0,3).map(v=>(
-                  <div key={v.id} className="flex items-center gap-1 group">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDot(v)}`}/>
-                    <span className="text-xs text-gray-600 truncate leading-tight">{creatorName(v.creator_id).split(' ')[0]}</span>
+  let label='';
+  if(calView==='monthly') label=anchor.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  else if(calView==='daily') label=anchor.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  else{
+    const first=new Date(days[0]+'T00:00:00'),last=new Date(days[days.length-1]+'T00:00:00');
+    label=first.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+last.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  }
+
+  function DayCell({ds,isToday,minH,compact}){
+    const dayVideos=byDate[ds]||[];
+    const dayNum=parseInt(ds.split('-')[2]);
+    const isOver=dragCalOver===ds;
+    const sel=selectedDay===ds;
+    return (
+      <div className={`rounded-lg p-1.5 border transition-all cursor-pointer ${isToday?'border-blue-400 bg-blue-50':sel?'border-lime-400 bg-lime-50':'border-gray-100 bg-gray-50/40'} ${isOver?'ring-2 ring-lime-300 border-lime-400':''}` }
+        style={{minHeight:minH||64}}
+        onClick={()=>setSelectedDay(sel?null:ds)}
+        onDragOver={e=>{e.preventDefault();setDragCalOver(ds);}}
+        onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setDragCalOver(null);}}
+        onDrop={e=>{e.preventDefault();dropOnDate(ds);}}
+      >
+        <div className={`text-xs font-bold mb-1 ${isToday?'text-blue-600':'text-gray-400'}`}>{dayNum}</div>
+        <div className="space-y-0.5">
+          {(compact?dayVideos.slice(0,3):dayVideos).map(v=>(
+            <div key={v.id} draggable
+              onDragStart={e=>{e.stopPropagation();e.dataTransfer.effectAllowed='move';setDragCalVideo({id:v.id,date:ds});}}
+              onDragEnd={()=>{setDragCalVideo(null);setDragCalOver(null);}}
+              onClick={e=>e.stopPropagation()}
+            >
+              {compact?(
+                <div className={`flex items-center gap-1 rounded px-1 py-0.5 ${calPill(v)} truncate`} title={v.video_title}>
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${calDot(v)}`}/>
+                  <span className="text-xs truncate font-medium leading-tight">{creatorName(v.creator_id).split(' ')[0]}</span>
+                </div>
+              ):(
+                <div className={`rounded-lg px-2 py-1.5 ${calPill(v)} border border-black/5`}>
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${calDot(v)}`}/>
+                    <span className="text-xs font-semibold truncate">{creatorName(v.creator_id)}</span>
                   </div>
-                ))}
-                {dayVideos.length > 3 && <div className="text-xs text-gray-400">+{dayVideos.length-3} more</div>}
-              </div>
+                  <p className="text-xs truncate opacity-80 leading-tight">{v.video_title}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <span className="text-xs opacity-70">{v.video_status}</span>
+                    {v.platform && <span className="text-xs opacity-60">· {v.platform.split('/')[0]}</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {compact&&dayVideos.length>3&&<div className="text-xs text-gray-400 px-1">+{dayVideos.length-3}</div>}
+        </div>
+        {isOver&&<div className="border border-dashed border-lime-400 rounded h-6 flex items-center justify-center mt-1"><span className="text-xs text-lime-500">Drop to reschedule</span></div>}
+      </div>
+    );
+  }
+
+  function MonthlyGrid(){
+    const year=anchor.getFullYear(),month=anchor.getMonth();
+    const firstDay=new Date(year,month,1).getDay();
+    const daysInMonth=new Date(year,month+1,0).getDate();
+    const cells=[];
+    for(let i=0;i<firstDay;i++)cells.push(null);
+    for(let d=1;d<=daysInMonth;d++)cells.push(d);
+    return (
+      <div>
+        <div className="grid grid-cols-7 gap-0.5 mb-1">
+          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
+            <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1">{d}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-0.5">
+          {cells.map((day,i)=>{
+            if(!day) return <div key={'e'+i}/>;
+            const ds=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            return <DayCell key={ds} ds={ds} isToday={ds===todayStr} minH={72} compact />;
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function MultiDayGrid(){
+    return (
+      <div className="grid gap-2" style={{gridTemplateColumns:`repeat(${days.length},1fr)`}}>
+        {days.map(ds=>{
+          const d=new Date(ds+'T00:00:00');
+          const dayLabel=d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+          const isToday=ds===todayStr;
+          return (
+            <div key={ds}>
+              <div className={`text-center text-xs font-semibold py-1 mb-1 rounded ${isToday?'text-blue-600 bg-blue-50':'text-gray-500'}`}>{dayLabel}</div>
+              <DayCell ds={ds} isToday={isToday} minH={calView==='daily'?320:180} compact={false}/>
             </div>
           );
         })}
       </div>
-      <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block"/>Posted</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-400 inline-block"/>Scheduled</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"/>Approved</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block"/>Other</span>
+    );
+  }
+
+  const selectedVideos=selectedDay?(byDate[selectedDay]||[]):[];
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <button onClick={()=>shiftAnchor(-1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-lg leading-none">‹</button>
+            <button onClick={goToday} className="text-xs px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium">Today</button>
+            <button onClick={()=>shiftAnchor(1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-lg leading-none">›</button>
+            <h3 className="font-semibold text-gray-800 text-sm">{label}</h3>
+          </div>
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            {[{key:'daily',label:'Day'},{key:'3day',label:'3-Day'},{key:'weekly',label:'Week'},{key:'monthly',label:'Month'}].map(t=>(
+              <button key={t.key} onClick={()=>{setCalView(t.key);setSelectedDay(null);}}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${calView===t.key?'bg-gray-900 text-white':'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {calView==='monthly'?<MonthlyGrid/>:<MultiDayGrid/>}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 pt-3 border-t border-gray-100">
+          {Object.entries(STATUS_COLORS_CAL).map(([s,c])=>(
+            <span key={s} className="flex items-center gap-1 text-xs text-gray-500">
+              <span className={`w-2 h-2 rounded-full inline-block ${c.dot}`}/>{s}
+            </span>
+          ))}
+        </div>
       </div>
+
+      {selectedDay&&selectedVideos.length>0&&(
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+            {new Date(selectedDay+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}
+            <span className="ml-2 text-gray-400 font-normal">{selectedVideos.length} video{selectedVideos.length!==1?'s':''}</span>
+          </h4>
+          <div className="space-y-2">
+            {selectedVideos.map(v=>(
+              <div key={v.id} className={`rounded-lg p-3 border border-black/5 ${calPill(v)}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">{v.video_title}</p>
+                    <p className="text-xs opacity-70 mt-0.5">{creatorName(v.creator_id)} · {v.platform}</p>
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${calPill(v)}`}>{v.video_status}</span>
+                </div>
+                {v.approval_status&&v.approval_status!=='Not submitted'&&(
+                  <p className="text-xs opacity-60 mt-1">Approval: {v.approval_status}</p>
+                )}
+                {v.post_url&&<a href={v.post_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline mt-1 inline-block">View post ↗</a>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -35329,7 +35493,7 @@ function Videos({ data, setData, navigate }) {
         </div>
       )}
 
-      {view === 'calendar' && <VideoCalendar videos={filtered} data={data} />}
+      {view === 'calendar' && <VideoCalendar videos={filtered} data={data} setData={setData} />}
 
       {view === 'timeline' && (
         <Card className="overflow-x-auto">
@@ -35905,10 +36069,13 @@ function Content({ data, setData }) {
 
   function saveAsset(form) {
     const now = Utils.now();
-    if (!form.id) {
-      setData(d=>({...d,content_assets:[...d.content_assets,{...form,id:Utils.uid(),created_at:now,updated_at:now}]}));
+    const isNew = !form.id;
+    const id = form.id || Utils.uid();
+    const log = { id: Utils.uid(), user_id: data.current_user_id, action: isNew ? 'Content added' : 'Content updated', related_creator_id: form.creator_id, related_deal_id: form.deal_id||null, related_campaign_id: form.campaign_id||null, related_payment_id: null, related_video_id: null, old_value: null, new_value: form.content_title, timestamp: now };
+    if (isNew) {
+      setData(d=>({...d, content_assets:[...d.content_assets,{...form,id,created_at:now,updated_at:now}], activity_log:[log,...d.activity_log]}));
     } else {
-      setData(d=>({...d,content_assets:d.content_assets.map(x=>x.id===form.id?{...form,updated_at:now}:x)}));
+      setData(d=>({...d, content_assets:d.content_assets.map(x=>x.id===form.id?{...form,updated_at:now}:x), activity_log:[log,...d.activity_log]}));
     }
     setModal(null);
   }
@@ -36788,26 +36955,50 @@ function App() {
         </nav>
 
         {/* Current user */}
-        <div className="p-3 border-t border-gray-800">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-lime-400 to-green-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-              {currentUser?.name?.[0] || 'U'}
-            </div>
-            {sidebarOpen && (
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-gray-200 truncate">{currentUser?.name}</p>
-                <p className="text-xs text-gray-500 truncate">{currentUser?.role}</p>
+        <div className="p-3 border-t border-gray-800 space-y-2">
+          {sidebarOpen ? (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-lime-400 to-green-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  {currentUser?.name?.[0] || 'U'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-gray-200 truncate">{currentUser?.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{currentUser?.role}</p>
+                </div>
               </div>
-            )}
-            {sidebarOpen && supaEnabled && (
-              <button onClick={handleSignOut} title="Sign out"
-                className="shrink-0 text-gray-500 hover:text-gray-300 p-0.5 transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
-            )}
-          </div>
+              <select
+                value={data.current_user_id}
+                onChange={e => setData(d => ({ ...d, current_user_id: e.target.value }))}
+                className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-gray-300 focus:border-lime-400 focus:outline-none"
+              >
+                {data.team_members.map(m => <option key={m.id} value={m.id}>{m.name} — {m.role}</option>)}
+              </select>
+              {supaEnabled && (
+                <button onClick={handleSignOut}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-red-900/40 text-gray-400 hover:text-red-400 text-xs font-medium transition-all border border-gray-700 hover:border-red-800">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Sign Out
+                </button>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-lime-400 to-green-600 flex items-center justify-center text-white text-xs font-bold">
+                {currentUser?.name?.[0] || 'U'}
+              </div>
+              {supaEnabled && (
+                <button onClick={handleSignOut} title="Sign out"
+                  className="text-gray-500 hover:text-red-400 transition-colors p-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </aside>
 
@@ -36846,13 +37037,6 @@ function App() {
                 {repostableCount} repostable
               </button>
             )}
-            <select
-              value={data.current_user_id}
-              onChange={e => setData(d => ({ ...d, current_user_id: e.target.value }))}
-              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-600 focus:border-lime-400"
-            >
-              {data.team_members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
           </div>
         </header>
 
