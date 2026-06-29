@@ -8,6 +8,10 @@ function getProductLabels(data) {
   return (data.product_labels && data.product_labels.length > 0) ? data.product_labels : PRODUCT_FIT;
 }
 
+function getCreatorTypes(data) {
+  return (data.creator_types && data.creator_types.length > 0) ? data.creator_types : CREATOR_TYPES;
+}
+
 function CreatorForm({ creator, data, setData, onSave, onClose }) {
   const [form, setForm] = React.useState(creator || {
     name:'', handle:'', primary_platform:'TikTok', tiktok_url:'', instagram_url:'', youtube_url:'',
@@ -25,7 +29,7 @@ function CreatorForm({ creator, data, setData, onSave, onClose }) {
         <Select label="Primary Platform" value={form.primary_platform} onChange={v => set('primary_platform',v)} options={PLATFORMS} />
         <ProductFitSelect label="Product Fit" value={form.product_fit} onChange={v => set('product_fit',v)} data={data} setData={setData} />
         <CampaignSelect label="Campaign" value={form.campaign_id} onChange={v => set('campaign_id',v)} data={data} setData={setData} />
-        <Select label="Creator Type" value={form.creator_type} onChange={v => set('creator_type',v)} options={CREATOR_TYPES} />
+        <Select label="Creator Type" value={form.creator_type} onChange={v => set('creator_type',v)} options={getCreatorTypes(data)} />
         <Select label="Source" value={form.source} onChange={v => set('source',v)} options={CREATOR_SOURCES} />
         <Select label="Current Status" value={form.current_status} onChange={v => set('current_status',v)} options={CREATOR_STATUSES} />
         <Select label="Owner" value={form.owner_id} onChange={v => set('owner_id',v)} options={data.team_members.map(m=>({value:m.id,label:m.name}))} />

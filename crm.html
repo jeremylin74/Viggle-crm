@@ -33594,6 +33594,10 @@ function mergeVigglers(data) {
       existingIds.add(c.id);
     }
   });
+  // Remove 'Viggler' or 'Vigglers' from product_labels — it's a source, not a product
+  if (data.product_labels) {
+    data.product_labels = data.product_labels.filter(l => l !== 'Viggler' && l !== 'Vigglers');
+  }
   return data;
 }
 
@@ -34383,6 +34387,10 @@ function getProductLabels(data) {
   return (data.product_labels && data.product_labels.length > 0) ? data.product_labels : PRODUCT_FIT;
 }
 
+function getCreatorTypes(data) {
+  return (data.creator_types && data.creator_types.length > 0) ? data.creator_types : CREATOR_TYPES;
+}
+
 function CreatorForm({ creator, data, setData, onSave, onClose }) {
   const [form, setForm] = React.useState(creator || {
     name:'', handle:'', primary_platform:'TikTok', tiktok_url:'', instagram_url:'', youtube_url:'',
@@ -34400,7 +34408,7 @@ function CreatorForm({ creator, data, setData, onSave, onClose }) {
         <Select label="Primary Platform" value={form.primary_platform} onChange={v => set('primary_platform',v)} options={PLATFORMS} />
         <ProductFitSelect label="Product Fit" value={form.product_fit} onChange={v => set('product_fit',v)} data={data} setData={setData} />
         <CampaignSelect label="Campaign" value={form.campaign_id} onChange={v => set('campaign_id',v)} data={data} setData={setData} />
-        <Select label="Creator Type" value={form.creator_type} onChange={v => set('creator_type',v)} options={CREATOR_TYPES} />
+        <Select label="Creator Type" value={form.creator_type} onChange={v => set('creator_type',v)} options={getCreatorTypes(data)} />
         <Select label="Source" value={form.source} onChange={v => set('source',v)} options={CREATOR_SOURCES} />
         <Select label="Current Status" value={form.current_status} onChange={v => set('current_status',v)} options={CREATOR_STATUSES} />
         <Select label="Owner" value={form.owner_id} onChange={v => set('owner_id',v)} options={data.team_members.map(m=>({value:m.id,label:m.name}))} />
@@ -36599,7 +36607,10 @@ function Settings({ data, setData, supaEnabled, onSupabaseConnect }) {
   const [testResult, setTestResult] = React.useState(null);
   const [newMember, setNewMember] = React.useState({name:'',email:'',role:'Team Member'});
   const [newLabel, setNewLabel] = React.useState('');
+  const [newCreatorType, setNewCreatorType] = React.useState('');
   const productLabels = data.product_labels || ['Viggle','PINOC','Both'];
+  const DEFAULT_CREATOR_TYPES = ['Football editor','3D animator','AI creator','Meme creator','Game developer','Tutorial creator','TikTok creator','YouTube creator','Instagram creator','Other'];
+  const creatorTypes = data.creator_types || DEFAULT_CREATOR_TYPES;
 
   function addLabel() {
     const lbl = newLabel.trim();
@@ -36610,6 +36621,17 @@ function Settings({ data, setData, supaEnabled, onSupabaseConnect }) {
 
   function removeLabel(lbl) {
     setData(d=>({...d, product_labels:(d.product_labels||['Viggle','PINOC','Both']).filter(l=>l!==lbl)}));
+  }
+
+  function addCreatorType() {
+    const t = newCreatorType.trim();
+    if (!t || creatorTypes.includes(t)) return;
+    setData(d=>({...d, creator_types:[...(d.creator_types||DEFAULT_CREATOR_TYPES), t]}));
+    setNewCreatorType('');
+  }
+
+  function removeCreatorType(t) {
+    setData(d=>({...d, creator_types:(d.creator_types||DEFAULT_CREATOR_TYPES).filter(x=>x!==t)}));
   }
 
   function saveSupabase() {
@@ -36725,6 +36747,23 @@ function Settings({ data, setData, supaEnabled, onSupabaseConnect }) {
         <div className="flex gap-2">
           <input value={newLabel} onChange={e=>setNewLabel(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addLabel()} placeholder="New label (e.g. Summer Drop, Viggle v2...)" className="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:border-blue-400" />
           <Btn size="sm" onClick={addLabel}>Add</Btn>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <h2 className="text-sm font-semibold text-gray-800 mb-1">Creator Types</h2>
+        <p className="text-xs text-gray-500 mb-3">These appear in the Creator Type dropdown when adding or editing a creator.</p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {creatorTypes.map(t => (
+            <span key={t} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-medium">
+              {t}
+              <button onClick={()=>removeCreatorType(t)} className="ml-1 text-purple-400 hover:text-red-500 font-bold leading-none">×</button>
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input value={newCreatorType} onChange={e=>setNewCreatorType(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addCreatorType()} placeholder="New type (e.g. Podcaster, Streamer...)" className="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:border-purple-400" />
+          <Btn size="sm" onClick={addCreatorType}>Add</Btn>
         </div>
       </Card>
 

@@ -200,6 +200,10 @@ function mergeVigglers(data) {
       existingIds.add(c.id);
     }
   });
+  // Remove 'Viggler' or 'Vigglers' from product_labels — it's a source, not a product
+  if (data.product_labels) {
+    data.product_labels = data.product_labels.filter(l => l !== 'Viggler' && l !== 'Vigglers');
+  }
   return data;
 }
 
