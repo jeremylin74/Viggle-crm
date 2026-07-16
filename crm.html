@@ -1,26 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Creator CRM — Viggle & PINOC</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Creator CRM — Viggle &amp; PINOC</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8fafc}
-.scrollbar-hide::-webkit-scrollbar{display:none}
-.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}
-.kanban-col{min-height:300px}
-.fade-in{animation:fadeIn .18s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
-.line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.line-clamp-3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .kanban-col { min-height: 200px; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 </style>
-<script>
-window.addEventListener('error', function(e) {
-  var d = document.getElementById('errors');
-  if (d) d.innerHTML += '<p style="color:red;font:13px monospace;padding:4px 8px;border-bottom:1px solid #fcc">❌ ' + e.message + (e.filename ? ' — ' + e.filename.split('/').pop() : '') + (e.lineno ? ':' + e.lineno : '') + '</p>';
-});
-</script>
+</head>
+<body>
+<div id="root"></div>
 <script>/**
  * @license React
  * react.development.js
@@ -33389,10 +33383,11 @@ var supabase=function(e){function t(e,t){var r={};for(var s in e)Object.prototyp
 //# sourceMappingURL=/sm/db1e74debfd3f9cc7991042b26b72f655e79299e941f4f972ee0ffe50273679e.map</script>
 <script>
 Babel.registerPreset('crm', {
-  presets: [[Babel.availablePresets['react'], { runtime: 'classic' }]]
+  presets: [['env',{modules:false}]],
+  plugins: [['transform-react-jsx',{runtime:'classic'}]]
 });
 </script>
-<script>// Mock data + localStorage persistence
+<script data-file="data.js">// Mock data + localStorage persistence
 const STORAGE_KEY = 'creator_crm_data';
 
 // Viggler program contacts (auto-imported, source: 'Viggler')
@@ -33603,7 +33598,7 @@ function mergeVigglers(data) {
 
 window.CRM = { loadData, saveData, resetData, mergeVigglers, defaultData };
 </script>
-<script>window.Utils = {
+<script data-file="utils.js">window.Utils = {
   uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
   },
@@ -33684,7 +33679,7 @@ window.CRM = { loadData, saveData, resetData, mergeVigglers, defaultData };
   },
 };
 </script>
-<script>// Supabase client — initialized lazily when URL+key are saved in Settings
+<script data-file="supabase.js">// Supabase client — initialized lazily when URL+key are saved in Settings
 // All data stored as a single JSONB blob in crm_data table
 (function () {
   var _client = null;
@@ -35297,6 +35292,7 @@ function VideoForm({ video, data, setData, onSave, onClose }) {
     draft_due_date:'', draft_submitted_date:'', review_due_date:'', scheduled_post_date:'',
     actual_post_date:'', video_status:'Awaiting Draft', approval_status:'Not submitted',
     repost_allowed:false, post_url:'', file_url:'', payment_status:'Not started',
+    views:'', likes:'', comments:'', shares:'',
     owner_id:data.current_user_id, notes:'',
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
@@ -35319,6 +35315,10 @@ function VideoForm({ video, data, setData, onSave, onClose }) {
         <Input label="Scheduled Post" value={form.scheduled_post_date} onChange={v=>set('scheduled_post_date',v)} type="date" />
         <Input label="Actual Post" value={form.actual_post_date} onChange={v=>set('actual_post_date',v)} type="date" />
         <Input label="Post URL" value={form.post_url} onChange={v=>set('post_url',v)} placeholder="https://..." className="col-span-2" />
+        <Input label="Views" value={form.views} onChange={v=>set('views',v)} type="number" placeholder="0" />
+        <Input label="Likes" value={form.likes} onChange={v=>set('likes',v)} type="number" placeholder="0" />
+        <Input label="Comments" value={form.comments} onChange={v=>set('comments',v)} type="number" placeholder="0" />
+        <Input label="Shares" value={form.shares} onChange={v=>set('shares',v)} type="number" placeholder="0" />
         <Select label="Payment Status" value={form.payment_status} onChange={v=>set('payment_status',v)} options={['Not started','Pending approval','Ready to pay','Paid','On hold']} />
         <Select label="Owner" value={form.owner_id} onChange={v=>set('owner_id',v)} options={data.team_members.map(m=>({value:m.id,label:m.name}))} />
       </div>
@@ -35740,6 +35740,320 @@ function Videos({ data, setData, navigate, myView }) {
       <Modal open={!!modal} onClose={()=>setModal(null)} title={modal?.id?'Edit Video':'Add Video'} size="lg">
         {modal!==null && <VideoForm video={modal?.id?modal:null} data={data} setData={setData} onSave={saveVideo} onClose={()=>setModal(null)} />}
       </Modal>
+    </div>
+  );
+}
+</script>
+<script type="text/babel" data-presets="crm" data-file="Analytics.js">function Analytics({ data, setData, navigate }) {
+  const [sortBy, setSortBy] = React.useState('views');
+  const [filterPlatform, setFilterPlatform] = React.useState('');
+  const [filterProject, setFilterProject] = React.useState('');
+  const [filterCreator, setFilterCreator] = React.useState('');
+  const [editingStats, setEditingStats] = React.useState(null); // video id
+  const [statsForm, setStatsForm] = React.useState({});
+
+  const creatorName = id => data.creators.find(c => c.id === id)?.name || '—';
+
+  // All posted videos
+  const posted = data.videos.filter(v => v.video_status === 'Posted' || v.actual_post_date);
+
+  const filtered = posted.filter(v =>
+    (!filterPlatform || v.platform === filterPlatform) &&
+    (!filterProject  || v.project === filterProject) &&
+    (!filterCreator  || v.creator_id === filterCreator)
+  );
+
+  const sorted = [...filtered].sort((a, b) => {
+    const n = k => Number(b[k] || 0) - Number(a[k] || 0);
+    if (sortBy === 'views')    return n('views');
+    if (sortBy === 'likes')    return n('likes');
+    if (sortBy === 'comments') return n('comments');
+    if (sortBy === 'date')     return (b.actual_post_date||'') > (a.actual_post_date||'') ? 1 : -1;
+    return 0;
+  });
+
+  // Aggregate stats
+  const totalViews    = posted.reduce((s, v) => s + Number(v.views||0), 0);
+  const totalLikes    = posted.reduce((s, v) => s + Number(v.likes||0), 0);
+  const totalComments = posted.reduce((s, v) => s + Number(v.comments||0), 0);
+  const totalShares   = posted.reduce((s, v) => s + Number(v.shares||0), 0);
+  const avgEng = totalViews > 0 ? ((totalLikes + totalComments) / totalViews * 100).toFixed(1) : '0.0';
+  const topVideo = [...posted].sort((a,b) => Number(b.views||0) - Number(a.views||0))[0];
+  const topCreatorMap = {};
+  posted.forEach(v => {
+    const id = v.creator_id;
+    if (!topCreatorMap[id]) topCreatorMap[id] = 0;
+    topCreatorMap[id] += Number(v.views||0);
+  });
+  const topCreatorId = Object.entries(topCreatorMap).sort((a,b)=>b[1]-a[1])[0]?.[0];
+
+  function fmtNum(n) {
+    n = Number(n||0);
+    if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+    return String(n);
+  }
+
+  function engRate(v) {
+    const views = Number(v.views||0);
+    if (!views) return '—';
+    return ((Number(v.likes||0) + Number(v.comments||0)) / views * 100).toFixed(1) + '%';
+  }
+
+  function startEdit(v) {
+    setEditingStats(v.id);
+    setStatsForm({ views: v.views||'', likes: v.likes||'', comments: v.comments||'', shares: v.shares||'' });
+  }
+
+  function saveStats(videoId) {
+    const now = Utils.now();
+    setData(d => ({ ...d, videos: d.videos.map(v => v.id === videoId ? { ...v, ...statsForm, updated_at: now } : v) }));
+    setEditingStats(null);
+  }
+
+  // Top 8 by views for bar chart
+  const chartData = [...posted]
+    .sort((a,b) => Number(b.views||0) - Number(a.views||0))
+    .slice(0, 8);
+  const maxViews = Math.max(...chartData.map(v => Number(v.views||0)), 1);
+
+  // Views by creator (top 6)
+  const byCreator = Object.entries(topCreatorMap)
+    .sort((a,b) => b[1]-a[1]).slice(0, 6);
+  const maxCreatorViews = Math.max(...byCreator.map(x => x[1]), 1);
+
+  // Views by platform
+  const byPlatform = {};
+  posted.forEach(v => {
+    const p = v.platform || 'Other';
+    byPlatform[p] = (byPlatform[p]||0) + Number(v.views||0);
+  });
+  const platformColors = { TikTok:'bg-black', Instagram:'bg-pink-500', YouTube:'bg-red-500', 'X / Twitter':'bg-blue-400' };
+
+  const statCard = (label, value, sub, color='text-gray-900') => (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <p className="text-xs text-gray-500 font-medium mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Content Performance</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{posted.length} posted videos · click any row to update stats</p>
+        </div>
+        <Btn variant="secondary" onClick={() => navigate('videos')}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+          Video Schedule
+        </Btn>
+      </div>
+
+      {/* Summary tiles */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {statCard('Total Views', fmtNum(totalViews), `across ${posted.length} videos`, 'text-blue-600')}
+        {statCard('Total Likes', fmtNum(totalLikes), `avg ${posted.length ? fmtNum(Math.round(totalLikes/posted.length)) : 0}/video`)}
+        {statCard('Comments', fmtNum(totalComments))}
+        {statCard('Avg Engagement', avgEng + '%', 'likes + comments / views', avgEng >= 5 ? 'text-green-600' : 'text-gray-900')}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <p className="text-xs text-gray-500 font-medium mb-1">Best Video</p>
+          {topVideo ? (
+            <>
+              <p className="text-sm font-bold text-gray-900 truncate">{topVideo.video_title}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{creatorName(topVideo.creator_id)} · {fmtNum(topVideo.views)} views</p>
+            </>
+          ) : <p className="text-sm text-gray-400">No data yet</p>}
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <p className="text-xs text-gray-500 font-medium mb-1">Top Creator</p>
+          {topCreatorId ? (
+            <>
+              <p className="text-sm font-bold text-gray-900">{creatorName(topCreatorId)}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{fmtNum(topCreatorMap[topCreatorId])} total views</p>
+            </>
+          ) : <p className="text-sm text-gray-400">No data yet</p>}
+        </div>
+      </div>
+
+      {/* Charts row */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Top videos bar chart */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Top Videos by Views</h3>
+          {chartData.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-8">No view data yet — update stats below</p>
+          ) : (
+            <div className="space-y-2">
+              {chartData.map(v => (
+                <div key={v.id} className="flex items-center gap-2">
+                  <div className="w-28 text-xs text-gray-600 truncate shrink-0">{creatorName(v.creator_id).split(' ')[0]}</div>
+                  <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+                    <div
+                      className="h-5 rounded-full bg-gradient-to-r from-lime-400 to-green-500 flex items-center justify-end pr-2 transition-all"
+                      style={{width: Math.max(8, (Number(v.views||0)/maxViews)*100) + '%'}}
+                    >
+                      <span className="text-xs font-bold text-gray-900 whitespace-nowrap">{fmtNum(v.views)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Views by creator */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Views by Creator</h3>
+          {byCreator.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-8">No data yet</p>
+          ) : (
+            <div className="space-y-2">
+              {byCreator.map(([id, views]) => (
+                <div key={id} className="flex items-center gap-2">
+                  <div className="w-28 text-xs text-gray-600 truncate shrink-0">{creatorName(id)}</div>
+                  <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+                    <div
+                      className="h-5 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 flex items-center justify-end pr-2 transition-all"
+                      style={{width: Math.max(8, (views/maxCreatorViews)*100) + '%'}}
+                    >
+                      <span className="text-xs font-bold text-white whitespace-nowrap">{fmtNum(views)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Platform breakdown */}
+      {Object.keys(byPlatform).length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Views by Platform</h3>
+          <div className="flex flex-wrap gap-3">
+            {Object.entries(byPlatform).sort((a,b)=>b[1]-a[1]).map(([p,v]) => (
+              <div key={p} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${platformColors[p]||'bg-gray-400'}`}/>
+                <span className="text-xs font-medium text-gray-700">{p}</span>
+                <span className="text-xs font-bold text-gray-900">{fmtNum(v)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filters + table */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="p-3 border-b border-gray-100 flex flex-wrap gap-2 items-center">
+          <select value={filterPlatform} onChange={e=>setFilterPlatform(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+            <option value="">All platforms</option>
+            {['TikTok','Instagram','YouTube','X / Twitter'].map(p=><option key={p}>{p}</option>)}
+          </select>
+          <select value={filterProject} onChange={e=>setFilterProject(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+            <option value="">All projects</option>
+            <option>Viggle</option><option>PINOC</option>
+          </select>
+          <select value={filterCreator} onChange={e=>setFilterCreator(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+            <option value="">All creators</option>
+            {data.creators.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <div className="ml-auto flex items-center gap-1 text-xs text-gray-500">
+            Sort:
+            {['views','likes','comments','date'].map(s=>(
+              <button key={s} onClick={()=>setSortBy(s)}
+                className={`px-2 py-1 rounded-md capitalize ${sortBy===s?'bg-gray-900 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="text-left py-2.5 px-4 font-semibold text-gray-500">Video</th>
+                <th className="text-left py-2.5 px-3 font-semibold text-gray-500">Creator</th>
+                <th className="text-left py-2.5 px-3 font-semibold text-gray-500">Platform</th>
+                <th className="text-left py-2.5 px-3 font-semibold text-gray-500">Posted</th>
+                <th className="text-right py-2.5 px-3 font-semibold text-gray-500">Views</th>
+                <th className="text-right py-2.5 px-3 font-semibold text-gray-500">Likes</th>
+                <th className="text-right py-2.5 px-3 font-semibold text-gray-500">Comments</th>
+                <th className="text-right py-2.5 px-3 font-semibold text-gray-500">Shares</th>
+                <th className="text-right py-2.5 px-3 font-semibold text-gray-500">Eng%</th>
+                <th className="py-2.5 px-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {sorted.length === 0 && (
+                <tr><td colSpan={10} className="py-12 text-center text-gray-400">No posted videos yet — mark videos as Posted in the Video Schedule</td></tr>
+              )}
+              {sorted.map(v => (
+                <tr key={v.id} className="hover:bg-gray-50/80 transition-colors">
+                  {editingStats === v.id ? (
+                    <>
+                      <td className="py-2 px-4 font-medium text-gray-800 max-w-xs truncate">{v.video_title}</td>
+                      <td className="py-2 px-3 text-gray-500">{creatorName(v.creator_id)}</td>
+                      <td className="py-2 px-3 text-gray-500">{v.platform}</td>
+                      <td className="py-2 px-3 text-gray-500">{Utils.fmt(v.actual_post_date)}</td>
+                      {['views','likes','comments','shares'].map(k => (
+                        <td key={k} className="py-2 px-3">
+                          <input
+                            type="number" value={statsForm[k]} onChange={e=>setStatsForm(f=>({...f,[k]:e.target.value}))}
+                            className="w-20 text-right border border-lime-400 rounded px-1.5 py-0.5 text-xs focus:outline-none"
+                            onKeyDown={e=>{if(e.key==='Enter')saveStats(v.id);if(e.key==='Escape')setEditingStats(null);}}
+                            autoFocus={k==='views'}
+                          />
+                        </td>
+                      ))}
+                      <td className="py-2 px-3 text-gray-400">—</td>
+                      <td className="py-2 px-3">
+                        <div className="flex gap-1">
+                          <Btn size="sm" onClick={()=>saveStats(v.id)}>Save</Btn>
+                          <Btn size="sm" variant="ghost" onClick={()=>setEditingStats(null)}>✕</Btn>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="py-2.5 px-4 font-medium text-gray-800 max-w-xs">
+                        <div className="truncate">{v.video_title}</div>
+                        <Badge className={Utils.productColor(v.project)}>{v.project}</Badge>
+                      </td>
+                      <td className="py-2.5 px-3 text-gray-600">{creatorName(v.creator_id)}</td>
+                      <td className="py-2.5 px-3 text-gray-500">{v.platform}</td>
+                      <td className="py-2.5 px-3 text-gray-500">{Utils.fmt(v.actual_post_date)}</td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-gray-800">{v.views ? fmtNum(v.views) : <span className="text-gray-300">—</span>}</td>
+                      <td className="py-2.5 px-3 text-right text-gray-600">{v.likes ? fmtNum(v.likes) : <span className="text-gray-300">—</span>}</td>
+                      <td className="py-2.5 px-3 text-right text-gray-600">{v.comments ? fmtNum(v.comments) : <span className="text-gray-300">—</span>}</td>
+                      <td className="py-2.5 px-3 text-right text-gray-600">{v.shares ? fmtNum(v.shares) : <span className="text-gray-300">—</span>}</td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className={`font-medium ${Number(v.views)>0?(Number(v.likes||0)+Number(v.comments||0))/Number(v.views)*100>=5?'text-green-600':'text-gray-600':'text-gray-300'}`}>
+                          {engRate(v)}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-1">
+                          <Btn size="sm" variant="ghost" onClick={()=>startEdit(v)}>Edit</Btn>
+                          {v.post_url && <a href={v.post_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-600 text-xs px-1">↗</a>}
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 border border-gray-100">
+        <strong>Auto-sync stats:</strong> TikTok, Instagram, and YouTube live stat sync requires API credentials (OAuth). Once you have them, drop them in Settings and stats will refresh automatically on a schedule.
+      </div>
     </div>
   );
 }
@@ -36926,6 +37240,7 @@ create policy "team write" on crm_data
   { id: 'deals',            label: 'Deals',           icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
   { id: 'contracts',        label: 'Contracts',       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
   { id: 'videos',           label: 'Video Schedule',  icon: 'M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' },
+  { id: 'analytics',        label: 'Analytics',       icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   { id: 'payments',         label: 'Payments',        icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
   { id: 'content',          label: 'Content',         icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
   { id: 'links',            label: 'Campaign Links',  icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
@@ -37276,6 +37591,7 @@ function App() {
           {page === 'deals'           && <Deals data={data} setData={setData} navigate={navigate} myView={myView} />}
           {page === 'contracts'       && <Contracts data={data} setData={setData} myView={myView} />}
           {page === 'videos'          && <Videos data={data} setData={setData} navigate={navigate} myView={myView} />}
+          {page === 'analytics'       && <Analytics data={data} setData={setData} navigate={navigate} />}
           {page === 'payments'        && <Payments data={data} setData={setData} />}
           {page === 'content'         && <Content data={data} setData={setData} />}
           {page === 'links'           && <CampaignLinks data={data} setData={setData} />}
@@ -37290,8 +37606,8 @@ function App() {
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
-</head>
-<body>
-<div id="errors" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff8f8;max-height:50vh;overflow:auto"></div>
-<div id="root"></div>
-</body></html>
+<script type="text/babel" data-presets="crm">
+ReactDOM.render(React.createElement(App), document.getElementById('root'));
+</script>
+</body>
+</html>
